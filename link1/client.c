@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 
 #define BUFFSIZE 512
-#define CONNECTED_PORT 9998
+#define CONNECTED_PORT 9999
 #define IP_ADDRESS "0.0.0.0"
 void Die(char *mess) { perror(mess); exit(1); }
 
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     Die("Failed to connect with server");
   }
 
-  fprintf(stdout,"Session ouverte - type help for help\n");
+  fprintf(stdout,"Session ouverte - type \"help\" for help\n");
 
 /* Send the word to the server */
 while (1) {
@@ -75,6 +75,8 @@ while (1) {
     if (bytes < 1) {
         Die("Failed to receive bytes from server");
     }
+    
+    
 
     // Assurer une chaîne terminée par \0
     buffer[bytes] = '\0';

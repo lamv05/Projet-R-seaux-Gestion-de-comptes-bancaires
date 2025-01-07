@@ -1,6 +1,5 @@
 all : tcp_client tcp_server
 
-
 tcp_client : client.c
 	gcc client.c -o client
 
