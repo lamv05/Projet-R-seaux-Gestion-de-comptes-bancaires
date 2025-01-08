@@ -260,11 +260,60 @@ int retrait(char id_client[],char id_compte[],float somme,char message[]){
 
   sqlite3_close(db);
 
-  snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f", id_compte, solde);
+  if (solde<0){
+    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f - Attention compte à découvert", id_compte, solde);
+  }
+  else{
+    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f", id_compte, solde);
+  }
 
   add_operation(id_client,id_compte,somme,"retrait");
   
   return 0;
+}
+
+int solde(char id_compte[],char message[]){
+  sqlite3 *db;
+  sqlite3_stmt *stmt;
+  char *err_msg = 0;
+  double solde;
+
+  int rc = sqlite3_open(DATABASE, &db);
+  
+  if (rc != SQLITE_OK) {
+      
+      fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      
+      return 1;
+  }
+    
+  char *sql = "SELECT solde FROM account WHERE id = ?";
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt, 1, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step1 = sqlite3_step(stmt);
+  
+  if (step1 == SQLITE_ROW) {
+      solde = sqlite3_column_double(stmt, 0); 
+  } 
+  else{
+      printf("No data found for the specified account.\n");
+  }
+
+  sqlite3_finalize(stmt);
+
+  sqlite3_close(db);
+
+  snprintf(message, BUFFSIZE, "RES_SOLDE - Solde du compte %s, %.2f", id_compte, solde);
+
 }
 
 
@@ -312,7 +361,6 @@ void HandleClient(int sock) {
         else if (strcmp(command, "RETRAIT")==0||strcmp(command, "retrait") == 0) {
           if (args==5){
             printf("RETRAIT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
-            strncpy(message, "OK - RETRAIT effectué", BUFFSIZE);
             if(check_args_validity(id_client,id_compte,password,message)==0){
               retrait(id_client,id_compte,somme,message);
             }
@@ -324,7 +372,9 @@ void HandleClient(int sock) {
         else if (strcmp(command, "SOLDE")==0||strcmp(command, "solde") == 0) {
           if (args == 4){
             printf("SOLDE demandé par %s pour le compte %s\n", id_client, id_compte);
-            snprintf(message, BUFFSIZE, "RES_SOLDE - Solde: %.2f, Dernière opération: 2025-01-07", 1234.56);
+            if(check_args_validity(id_client,id_compte,password,message)==0){
+              solde(id_compte,message);
+            }
           }
           else{
             strncpy(message, "KO - Erreur de paramètre - SOLDE <id_client id_compte password>", BUFFSIZE);
