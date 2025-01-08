@@ -54,7 +54,7 @@ while (1) {
     char commande[BUFFSIZE]; // Tampon pour la commande complète
 
     // Demander une commande
-    fprintf(stdout, "Request : ");
+    fprintf(stdout, "> ");
     fgets(commande, BUFFSIZE, stdin); // Lire la commande complète avec arguments
     commande[strcspn(commande, "\n")] = '\0'; // Supprimer le caractère '\n'
 

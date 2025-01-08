@@ -66,7 +66,7 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
 
   sqlite3_finalize(stmt1);
 
-  char *sql2 = "SELECT * FROM  account WHERE id=?";
+  char *sql2 = "SELECT * FROM account WHERE id=?";
 
   rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
 
@@ -83,6 +83,19 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
     sqlite3_close(db);
     return 1; 
   }
+
+  char id_cli[BUFFSIZE];
+  const unsigned char *text2 = sqlite3_column_text(stmt2, 2);
+  if (text2 != NULL) {
+    strncpy(id_cli, (const char *)text2, sizeof(id_cli) - 1);
+    id_cli[sizeof(id_cli) - 1] = '\0'; // Assurez la terminaison de la chaîne
+  }   
+  if (strcmp(id_cli,id_client)){
+    strncpy(message, "KO - Vous n'êtes titulaire de ce compte", BUFFSIZE);
+    sqlite3_close(db);
+    return 1; 
+  }
+
   sqlite3_finalize(stmt2);
   sqlite3_close(db);
   
@@ -349,6 +362,53 @@ int solde(char id_compte[],char message[]){
   sqlite3_close(db);
 }
 
+int operation(char id_compte[], char message[]) {
+    sqlite3 *db;
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_open(DATABASE, &db);
+
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 1;
+    }
+
+    // Requête SQL pour les 10 dernières opérations
+    char *sql = "SELECT id, montant, date_operation, op FROM operation WHERE account_id = ? ORDER BY date_operation DESC LIMIT 10;";
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 1;
+    }
+
+    // Lier le paramètre id_compte
+    sqlite3_bind_text(stmt, 1, id_compte, -1, SQLITE_STATIC);
+
+    // Initialiser le message pour stocker les résultats
+    snprintf(message, BUFFSIZE, "Les 10 dernières opérations pour le compte %s :\nID\tDate\t\t\tOpération\tMontant\n", id_compte);
+
+    // Parcourir les résultats
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int id = sqlite3_column_int(stmt, 0);
+        double montant = sqlite3_column_double(stmt, 1);
+        const unsigned char *date_op = sqlite3_column_text(stmt, 2);
+        const unsigned char *op = sqlite3_column_text(stmt, 3);
+
+        // Ajouter l'opération au message
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "%d\t%s\t%s\t\t%.2f\n", id, date_op, op,montant);
+        strncat(message, buffer, BUFFSIZE - strlen(message) - 1);
+    }
+
+    // Finaliser la requête et fermer la base de données
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return 0;
+}
+
 
 void HandleClient(int sock) {
     char buffer[BUFFSIZE];
@@ -416,7 +476,9 @@ void HandleClient(int sock) {
         else if (strcmp(command, "OPERATIONS")==0||strcmp(command, "operations") == 0) {
           if(args == 4){
             printf("OPERATIONS demandé par %s pour le compte %s\n", id_client, id_compte);
-            strncpy(message, "RES_OPERATIONS - Liste des 10 dernières opérations", BUFFSIZE);
+            if(check_args_validity(id_client,id_compte,password,message)==0){
+              operation(id_compte,message);
+            }
           }
           else{
             strncpy(message, "KO - Erreur de paramètre - OPERATIONS <id_client id_compte password>", BUFFSIZE);
