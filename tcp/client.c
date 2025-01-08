@@ -65,7 +65,7 @@ while (1) {
     }
 
     // Vérifier si l'utilisateur souhaite quitter
-        if (strncmp(commande, "exit", 4) == 0) {
+        if (strncmp(commande, "exit", 4) == 0 || strncmp(commande, "quit", 4) == 0) {
             printf("Session closed\n");
             break;
         }

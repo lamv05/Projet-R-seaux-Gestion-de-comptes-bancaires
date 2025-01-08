@@ -53,14 +53,12 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
       }      
 
       if (strcmp(cli_password, password)!=0){
-        printf("Password entré incorrect\n");
         strncpy(message, "KO - Password entré incorrect", BUFFSIZE);
         sqlite3_close(db);
         return 1; 
       }   
     }
     else{
-      printf("L'identifiant %s n'existe pas\n",id_client);
       strncpy(message, "KO - L'identifiant entré n'existe pas", BUFFSIZE);
       sqlite3_close(db);
       return 1;
@@ -81,7 +79,6 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
   int step2 = sqlite3_step(stmt2);
 
   if (step2!=SQLITE_ROW){
-    printf("Le compte n'existe pas\n");
     strncpy(message, "KO - Le compte entré n'existe pas", BUFFSIZE);
     sqlite3_close(db);
     return 1; 
@@ -92,42 +89,117 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
   return 0;
 }
 
+/*
+Vérif somme
+Récupère somme du compte
+Update la value - personnalise le message si <0
+INSERT INTO operations
+*/
+/*
+faire fonction add_operations(montant,client,compte)
+*/
 
-// void ajout(char id_client[],char id_compte[],char password[],float somme){
-//   sqlite3 *db;
-//   char *err_msg = 0;
+void add_operation(char id_client[],char id_compte[],float somme,char op[]){
+  sqlite3 *db;
+  sqlite3_stmt *stmt;
+  char *err_msg = 0;
+
+  int rc = sqlite3_open(DATABASE, &db);
   
-//   int rc = sqlite3_open(DATABASE, &db);
+  if (rc != SQLITE_OK) {
+      
+      fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      
+      return;
+  }
+    
+  char *sql = "INSERT INTO operation(montant,op,account_id,client_id) VALUES(?,?,?,?);";
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   
-//   if (rc != SQLITE_OK) {
-      
-//       fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
-//       sqlite3_close(db);
-      
-//       return 1;
-//   }
-    
-//   char *sql = "UPDATE compte SET montant= WHERE id=";
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_double(stmt, 1, (double)somme);
+    sqlite3_bind_text(stmt, 2, op, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, id_compte, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, id_client, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
 
-//     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-    
-//     if (rc != SQLITE_OK ) {
-        
-//         fprintf(stderr, "SQL error: %s\n", err_msg);
-        
-//         sqlite3_free(err_msg);        
-//         sqlite3_close(db);
-        
-//         return 1;
-//     } 
+  int step = sqlite3_step(stmt);
 
-//     int last_id = sqlite3_last_insert_rowid(db);
-//     printf("The last Id of the inserted row is %d\n", last_id);
+  sqlite3_finalize(stmt);
+
+  sqlite3_close(db);
+}
+
+// pas de test sur le type de somme
+int ajout(char id_client[],char id_compte[],float somme,char message[]){
+  sqlite3 *db;
+  sqlite3_stmt *stmt1,*stmt2;
+  double solde;
+  char *err_msg = 0;
+  
+  int rc = sqlite3_open(DATABASE, &db);
+  
+  if (rc != SQLITE_OK) {
+      
+      fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      
+      return 1;
+  }
     
-//     sqlite3_close(db);
-    
-//     return 0;
-// }
+  char *sql1 = "SELECT solde FROM account WHERE id = ?";
+
+  rc = sqlite3_prepare_v2(db, sql1, -1, &stmt1, NULL);
+  
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt1, 1, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step1 = sqlite3_step(stmt1);
+  
+  if (step1 == SQLITE_ROW) {
+      solde = sqlite3_column_double(stmt1, 0); 
+  } 
+  else{
+      printf("No data found for the specified account.\n");
+  }
+
+  sqlite3_finalize(stmt1);
+
+  solde = solde + somme;  
+
+  char *sql2 = "UPDATE account SET solde=? WHERE id=?";
+
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
+
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_double(stmt2, 1, solde);
+    sqlite3_bind_text(stmt2, 2, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step2 = sqlite3_step(stmt2);
+
+  sqlite3_finalize(stmt2);
+
+  sqlite3_close(db);
+
+  snprintf(message, BUFFSIZE, "OK - Nouveau solde du compte %s, %.2f", id_compte, solde);
+
+  add_operation(id_client,id_compte,somme,"ajout");
+  
+  return 0;
+}
 
 
 void HandleClient(int sock) {
@@ -153,7 +225,7 @@ void HandleClient(int sock) {
 
         int args = sscanf(buffer, "%s %s %s %s %f", command, id_client, id_compte, password, &somme);
 
-        if (strcmp(command, "exit") == 0) {
+        if (strcmp(command, "exit") == 0 || strcmp(command, "quit") == 0) {
           printf("Client disconnected\n");
           break;
         } 
@@ -164,7 +236,7 @@ void HandleClient(int sock) {
           if (args==5){
             printf("AJOUT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
             if(check_args_validity(id_client,id_compte,password,message)==0){
-              strncpy(message, "OK - AJOUT effectué", BUFFSIZE);
+              ajout(id_client,id_compte,somme,message);
             }
           }
           else{
