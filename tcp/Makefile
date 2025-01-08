@@ -1,10 +1,10 @@
 all : tcp_client tcp_server
 
 tcp_client : client.c
-	gcc client.c -o client
+	gcc client.c -o client -lsqlite3 -std=c99
 
 tcp_server : server.c
-	gcc server.c -o server
+	gcc server.c -o server -lsqlite3 -std=c99
 
 clear :
 	rm -rf server client

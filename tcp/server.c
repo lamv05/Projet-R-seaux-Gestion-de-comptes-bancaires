@@ -5,11 +5,130 @@
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <sqlite3.h>
+
 
 #define MAXPENDING 5    /* Max connection requests */
 #define BUFFSIZE 512
 #define CONNECTED_PORT 9999
+#define DATABASE "bank.db"
+
 void Die(char *mess) { perror(mess); exit(1); }
+
+int check_args_validity(char id_client[],char id_compte[],char password[],char message[]){
+  sqlite3 *db;
+  sqlite3_stmt *stmt1,*stmt2;
+  char *err_msg = 0;
+  
+  int rc = sqlite3_open(DATABASE, &db);
+  
+  if (rc != SQLITE_OK) {
+      
+      fprintf(stderr, "Cannot open database: %s\n", 
+              sqlite3_errmsg(db));
+      sqlite3_close(db);
+      
+      return 1;
+  }
+  
+  char *sql1 = "SELECT * FROM client WHERE id=?";
+      
+  rc = sqlite3_prepare_v2(db, sql1, -1, &stmt1, NULL);
+  
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt1, 1, id_client, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+  int step1 = sqlite3_step(stmt1);
+    
+    if (step1 == SQLITE_ROW) {
+      
+      char cli_password[BUFFSIZE];
+      const unsigned char *text1 = sqlite3_column_text(stmt1, 3);
+      if (text1 != NULL) {
+          strncpy(cli_password, (const char *)text1, sizeof(cli_password) - 1);
+          cli_password[sizeof(cli_password) - 1] = '\0'; // Assurez la terminaison de la chaîne
+      }      
+
+      if (strcmp(cli_password, password)!=0){
+        printf("Password entré incorrect\n");
+        strncpy(message, "KO - Password entré incorrect", BUFFSIZE);
+        sqlite3_close(db);
+        return 1; 
+      }   
+    }
+    else{
+      printf("L'identifiant %s n'existe pas\n",id_client);
+      strncpy(message, "KO - L'identifiant entré n'existe pas", BUFFSIZE);
+      sqlite3_close(db);
+      return 1;
+    }
+
+  sqlite3_finalize(stmt1);
+
+  char *sql2 = "SELECT * FROM  account WHERE id=?";
+
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
+
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt2, 1, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+  int step2 = sqlite3_step(stmt2);
+
+  if (step2!=SQLITE_ROW){
+    printf("Le compte n'existe pas\n");
+    strncpy(message, "KO - Le compte entré n'existe pas", BUFFSIZE);
+    sqlite3_close(db);
+    return 1; 
+  }
+  sqlite3_finalize(stmt2);
+  sqlite3_close(db);
+  
+  return 0;
+}
+
+
+// void ajout(char id_client[],char id_compte[],char password[],float somme){
+//   sqlite3 *db;
+//   char *err_msg = 0;
+  
+//   int rc = sqlite3_open(DATABASE, &db);
+  
+//   if (rc != SQLITE_OK) {
+      
+//       fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+//       sqlite3_close(db);
+      
+//       return 1;
+//   }
+    
+//   char *sql = "UPDATE compte SET montant= WHERE id=";
+
+//     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+    
+//     if (rc != SQLITE_OK ) {
+        
+//         fprintf(stderr, "SQL error: %s\n", err_msg);
+        
+//         sqlite3_free(err_msg);        
+//         sqlite3_close(db);
+        
+//         return 1;
+//     } 
+
+//     int last_id = sqlite3_last_insert_rowid(db);
+//     printf("The last Id of the inserted row is %d\n", last_id);
+    
+//     sqlite3_close(db);
+    
+//     return 0;
+// }
+
 
 void HandleClient(int sock) {
     char buffer[BUFFSIZE];
@@ -44,7 +163,9 @@ void HandleClient(int sock) {
         else if (strcmp(command, "AJOUT") == 0 ||strcmp(command, "ajout") == 0) {
           if (args==5){
             printf("AJOUT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
-            strncpy(message, "OK - AJOUT effectué", BUFFSIZE);
+            if(check_args_validity(id_client,id_compte,password,message)==0){
+              strncpy(message, "OK - AJOUT effectué", BUFFSIZE);
+            }
           }
           else{
             strncpy(message, "KO - Erreur de paramètre - AJOUT <id_client id_compte password somme>", BUFFSIZE);
