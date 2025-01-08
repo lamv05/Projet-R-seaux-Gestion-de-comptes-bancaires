@@ -194,7 +194,7 @@ int ajout(char id_client[],char id_compte[],float somme,char message[]){
 
   sqlite3_close(db);
 
-  snprintf(message, BUFFSIZE, "OK - Ajout effectué - Nouveau solde du compte %s, %.2f", id_compte, solde);
+  snprintf(message, BUFFSIZE, "OK - Ajout effectué - Nouveau solde du compte %s : %.2f", id_compte, solde);
 
   add_operation(id_client,id_compte,somme,"ajout");
   
@@ -261,10 +261,10 @@ int retrait(char id_client[],char id_compte[],float somme,char message[]){
   sqlite3_close(db);
 
   if (solde<0){
-    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f - Attention compte à découvert", id_compte, solde);
+    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Solde restant du compte %s : %.2f - Attention compte à découvert", id_compte, solde);
   }
   else{
-    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f", id_compte, solde);
+    snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Solde restant du compte %s : %.2f", id_compte, solde);
   }
 
   add_operation(id_client,id_compte,somme,"retrait");
@@ -274,9 +274,10 @@ int retrait(char id_client[],char id_compte[],float somme,char message[]){
 
 int solde(char id_compte[],char message[]){
   sqlite3 *db;
-  sqlite3_stmt *stmt;
+  sqlite3_stmt *stmt1,*stmt2;
   char *err_msg = 0;
   double solde;
+  char date_op[31];
 
   int rc = sqlite3_open(DATABASE, &db);
   
@@ -288,32 +289,64 @@ int solde(char id_compte[],char message[]){
       return 1;
   }
     
-  char *sql = "SELECT solde FROM account WHERE id = ?";
+  char *sql1 = "SELECT solde FROM account WHERE id = ?";
 
-  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  rc = sqlite3_prepare_v2(db, sql1, -1, &stmt1, NULL);
   
   if (rc == SQLITE_OK) {
         
-    sqlite3_bind_text(stmt, 1, id_compte, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt1, 1, id_compte, -1, SQLITE_STATIC);
   } else {
     fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
   }
 
-  int step1 = sqlite3_step(stmt);
+  int step1 = sqlite3_step(stmt1);
   
   if (step1 == SQLITE_ROW) {
-      solde = sqlite3_column_double(stmt, 0); 
+      solde = sqlite3_column_double(stmt1, 0); 
   } 
   else{
       printf("No data found for the specified account.\n");
   }
 
-  sqlite3_finalize(stmt);
+  sqlite3_finalize(stmt1);
 
+  char *sql2 = "SELECT date_operation FROM operation WHERE account_id = ? ORDER BY date_operation DESC LIMIT 1;";
+
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
+  
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt2, 1, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step2 = sqlite3_step(stmt2);
+  if (step2 == SQLITE_ROW) {
+    const unsigned char *text = sqlite3_column_text(stmt2, 0); // Récupère la date sous forme de texte
+
+    if (text != NULL) {
+      // Copie en toute sécurité dans date_op (en supposant que la date n'excède pas 30 caractères)
+      strncpy(date_op, (const char *)text, sizeof(date_op) - 1);
+      date_op[sizeof(date_op) - 1] = '\0'; // Assure une terminaison nulle
+    } 
+    else{
+      strcpy(date_op, "N/A"); // Valeur par défaut si la colonne est NULL
+    }
+  } 
+  else{
+    strcpy(date_op, "N/A"); // Valeur par défaut si aucune ligne n'est retournée
+  }
+
+  // Finalisation
+  sqlite3_finalize(stmt2);
+
+  // Message formaté
+  snprintf(message, BUFFSIZE, "RES_SOLDE - Solde du compte %s : %.2f\nDate dernière opération : %s", id_compte, solde, date_op);
+
+  // Fermeture de la base
   sqlite3_close(db);
-
-  snprintf(message, BUFFSIZE, "RES_SOLDE - Solde du compte %s, %.2f", id_compte, solde);
-
 }
 
 
