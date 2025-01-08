@@ -194,9 +194,75 @@ int ajout(char id_client[],char id_compte[],float somme,char message[]){
 
   sqlite3_close(db);
 
-  snprintf(message, BUFFSIZE, "OK - Nouveau solde du compte %s, %.2f", id_compte, solde);
+  snprintf(message, BUFFSIZE, "OK - Ajout effectué - Nouveau solde du compte %s, %.2f", id_compte, solde);
 
   add_operation(id_client,id_compte,somme,"ajout");
+  
+  return 0;
+}
+
+// pas de test sur le type de somme
+int retrait(char id_client[],char id_compte[],float somme,char message[]){
+  sqlite3 *db;
+  sqlite3_stmt *stmt1,*stmt2;
+  double solde;
+  char *err_msg = 0;
+  
+  int rc = sqlite3_open(DATABASE, &db);
+  
+  if (rc != SQLITE_OK) {
+      
+      fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+      sqlite3_close(db);
+      
+      return 1;
+  }
+    
+  char *sql1 = "SELECT solde FROM account WHERE id = ?";
+
+  rc = sqlite3_prepare_v2(db, sql1, -1, &stmt1, NULL);
+  
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_text(stmt1, 1, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step1 = sqlite3_step(stmt1);
+  
+  if (step1 == SQLITE_ROW) {
+      solde = sqlite3_column_double(stmt1, 0); 
+  } 
+  else{
+      printf("No data found for the specified account.\n");
+  }
+
+  sqlite3_finalize(stmt1);
+
+  solde = solde - somme;  
+
+  char *sql2 = "UPDATE account SET solde=? WHERE id=?";
+
+  rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
+
+  if (rc == SQLITE_OK) {
+        
+    sqlite3_bind_double(stmt2, 1, solde);
+    sqlite3_bind_text(stmt2, 2, id_compte, -1, SQLITE_STATIC);
+  } else {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+  }
+
+  int step2 = sqlite3_step(stmt2);
+
+  sqlite3_finalize(stmt2);
+
+  sqlite3_close(db);
+
+  snprintf(message, BUFFSIZE, "OK - Retrait effectuée - Nouveau solde du compte %s, %.2f", id_compte, solde);
+
+  add_operation(id_client,id_compte,somme,"retrait");
   
   return 0;
 }
@@ -247,6 +313,9 @@ void HandleClient(int sock) {
           if (args==5){
             printf("RETRAIT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
             strncpy(message, "OK - RETRAIT effectué", BUFFSIZE);
+            if(check_args_validity(id_client,id_compte,password,message)==0){
+              retrait(id_client,id_compte,somme,message);
+            }
           }
           else{
             strncpy(message, "KO - Erreur de paramètre - RETRAIT <id_client id_compte password somme>", BUFFSIZE);
