@@ -22,6 +22,8 @@ sqlite3
 
 ## Contenu base de donné
 
+Utile pour effectuer des requêtes
+
 Table client
 
 id | nom     |  prenom  | cli_password | adresse | phone_num
