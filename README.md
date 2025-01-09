@@ -24,19 +24,19 @@ sqlite3
 
 Table client
 
-id  nom       prenom   cli_password  adresse  phone_num
+id | nom     |  prenom  | cli_password | adresse | phone_num
 --  --------  -------  ------------  -------  ---------
-1   Jean      Jacques  123                             
-2   Bertrand  Bernard  123                             
-3   Jean      Marie    123
+1  | Jean    | Jacques | 123                             
+2  | Bertrand | Bernard | 123                             
+3  | Jean     | Marie  |  123
 
 Table account
 
-id  solde  client_id
+id | solde | client_id
 --  -----  ---------
-1   100.0  1        
-2   200.0  2        
-3   500.0  3   
+1  | 100.0 | 1        
+2  | 200.0 | 2        
+3  | 500.0 | 3   
 
 ## Fonctionnement 
 
