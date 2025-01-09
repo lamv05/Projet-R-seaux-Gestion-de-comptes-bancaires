@@ -10,7 +10,7 @@
 
 #define MAXPENDING 5    /* Max connection requests */
 #define BUFFSIZE 512
-#define CONNECTED_PORT 9999
+#define CONNECTED_PORT 9998
 #define DATABASE "bank.db"
 
 void Die(char *mess) { perror(mess); exit(1); }
@@ -53,7 +53,7 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
       }      
 
       if (strcmp(cli_password, password)!=0){
-        strncpy(message, "KO - Password entré incorrect", BUFFSIZE);
+        strncpy(message, "KO - Password incorrect", BUFFSIZE);
         sqlite3_close(db);
         return 1; 
       }   
@@ -102,15 +102,6 @@ int check_args_validity(char id_client[],char id_compte[],char password[],char m
   return 0;
 }
 
-/*
-Vérif somme
-Récupère somme du compte
-Update la value - personnalise le message si <0
-INSERT INTO operations
-*/
-/*
-faire fonction add_operations(montant,client,compte)
-*/
 
 void add_operation(char id_client[],char id_compte[],float somme,char op[]){
   sqlite3 *db;
@@ -438,11 +429,11 @@ void HandleClient(int sock) {
           break;
         } 
         else if (strcmp(command, "help") == 0){
-          strncpy(message, "\nAJOUT <id_client id_compte password somme>\tAjouter au solde\nRETRAIT <id_client id_compte password somme>\tFaire un retrait\nSOLDE <id_client id_compte password>\tAfficher le solde du compte\nOPERATIONS <id_client id_compte password>\tAffiche les 10 dernières opérations\n\nhelp\tAfficher l'aide\nexit\tQuitter\n", BUFFSIZE);
+          strncpy(message, "\nAJOUT <id_client id_compte password somme>\tAjouter au solde\nRETRAIT <id_client id_compte password somme>\tFaire un retrait\nSOLDE <id_client id_compte password>\t\tAfficher le solde du compte\nOPERATIONS <id_client id_compte password>\tAffiche les 10 dernières opérations\n\nhelp\tAfficher l'aide\nexit\tQuitter\n", BUFFSIZE);
         }
         else if (strcmp(command, "AJOUT") == 0 ||strcmp(command, "ajout") == 0) {
           if (args==5){
-            printf("AJOUT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
+            printf("AJOUT effectué par utilisateur %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
             if(check_args_validity(id_client,id_compte,password,message)==0){
               ajout(id_client,id_compte,somme,message);
             }
@@ -453,7 +444,7 @@ void HandleClient(int sock) {
         } 
         else if (strcmp(command, "RETRAIT")==0||strcmp(command, "retrait") == 0) {
           if (args==5){
-            printf("RETRAIT demandé par %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
+            printf("RETRAIT effectué par utilisateur %s pour le compte %s avec somme %.2f\n", id_client, id_compte, somme);
             if(check_args_validity(id_client,id_compte,password,message)==0){
               retrait(id_client,id_compte,somme,message);
             }
@@ -464,7 +455,7 @@ void HandleClient(int sock) {
         } 
         else if (strcmp(command, "SOLDE")==0||strcmp(command, "solde") == 0) {
           if (args == 4){
-            printf("SOLDE demandé par %s pour le compte %s\n", id_client, id_compte);
+            printf("SOLDE demandé par l'utilisateur %s pour le compte %s\n", id_client, id_compte);
             if(check_args_validity(id_client,id_compte,password,message)==0){
               solde(id_compte,message);
             }
@@ -475,7 +466,7 @@ void HandleClient(int sock) {
         } 
         else if (strcmp(command, "OPERATIONS")==0||strcmp(command, "operations") == 0) {
           if(args == 4){
-            printf("OPERATIONS demandé par %s pour le compte %s\n", id_client, id_compte);
+            printf("OPERATIONS demandé par utilisateur %s pour le compte %s\n", id_client, id_compte);
             if(check_args_validity(id_client,id_compte,password,message)==0){
               operation(id_compte,message);
             }
@@ -503,13 +494,7 @@ void HandleClient(int sock) {
 int main(int argc, char *argv[]) {
   int serversock, clientsock;
   struct sockaddr_in echoserver, echoclient;
-  
-  /*
-  if (argc != 2) {
-    fprintf(stderr, "USAGE: echoserver <port>\n");
-    exit(1);
-  }
-  */
+
 
   /* Create the TCP socket */
   // PF_INET = AF_INET = IPV4 protocols = TCP,

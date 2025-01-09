@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 
 #define BUFFSIZE 512
-#define CONNECTED_PORT 9999
+#define CONNECTED_PORT 9998
 #define IP_ADDRESS "0.0.0.0"
 void Die(char *mess) { perror(mess); exit(1); }
 
